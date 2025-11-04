@@ -435,8 +435,25 @@ def create_debug_visualization(slides_dir, debug_dir, slides_data):
 
         # Draw bounding boxes
         for region in data['regions']:
+            # Skip drawing boxes that are clearly problematic
+            x1, y1, x2, y2 = region['bbox']
+            box_width = x2 - x1
+            box_height = y2 - y1
+            
+            # Skip extremely large boxes that likely indicate OCR errors
+            if box_width > DEFAULT_BASE * 0.9 or box_height > DEFAULT_BASE * 0.9:
+                continue
+            
             mapped = apply_transform(region['bbox'], transform, width, height)
             refined = refine_bbox(gray, mapped)
+
+            # Additional validation: skip if refined box is still too large or invalid
+            refined_width = refined[2] - refined[0]
+            refined_height = refined[3] - refined[1]
+            if refined_width < 5 or refined_height < 5:
+                continue
+            if refined_width > width * 0.95 or refined_height > height * 0.95:
+                continue
 
             color = COLORS.get(region['type'], (255, 255, 255))
 

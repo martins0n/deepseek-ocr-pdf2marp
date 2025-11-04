@@ -267,8 +267,26 @@ def draw_debug(image_path: Path, regions, transform, output_path: Path):
         font = ImageFont.load_default()
 
     for region in regions:
+        # Skip drawing boxes that are clearly problematic
+        x1, y1, x2, y2 = region["bbox"]
+        box_width = x2 - x1
+        box_height = y2 - y1
+        
+        # Skip extremely large boxes that likely indicate OCR errors
+        if box_width > DEFAULT_BASE * 0.9 or box_height > DEFAULT_BASE * 0.9:
+            continue
+        
         bbox = apply_transform(region["bbox"], transform, width, height)
         bbox = refine_bbox(gray, bbox)
+        
+        # Additional validation: skip if refined box is still too large or invalid
+        refined_width = bbox[2] - bbox[0]
+        refined_height = bbox[3] - bbox[1]
+        if refined_width < 5 or refined_height < 5:
+            continue
+        if refined_width > width * 0.95 or refined_height > height * 0.95:
+            continue
+        
         color = COLORS.get(region["type"], (255, 255, 255))
         line_width = max(1, int(4 * default_scale))
         for offset in range(line_width):
