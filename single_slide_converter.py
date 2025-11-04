@@ -27,8 +27,8 @@ except ImportError:  # pragma: no cover
 MODEL_NAME = "deepseek-ai/DeepSeek-OCR"
 PROMPT = "<image>\n<|grounding|>Convert the slide to markdown."
 DEFAULT_BASE = 1024
-LATEX_DISPLAY = re.compile(r"\\\\\[(.*?)\\\\\]", re.DOTALL)
-LATEX_INLINE = re.compile(r"\\\\\((.*?)\\\\\)")
+LATEX_DISPLAY = re.compile(r"\\\[(.+?)\\\]", re.DOTALL)
+LATEX_INLINE = re.compile(r"\\\((.+?)\\\)")
 REGION_PATTERN = re.compile(
     r"<\|ref\|>([^<]+)<\|/ref\|><\|det\|>\[\[([^\]]+)\]\]<\|/det\|>(.*?)(?=<\|ref\||$)",
     re.DOTALL,
@@ -118,8 +118,8 @@ def parse_regions(slide_body: str):
 def clean_slide_content(slide_body: str):
     text = re.sub(r"<\|ref\|>[^<]*<\|/ref\|>", "", slide_body)
     text = re.sub(r"<\|det\|>\[\[.*?\]\]<\|/det\|>", "", text)
-    text = LATEX_DISPLAY.sub(r"$$\\1$$", text)
-    text = LATEX_INLINE.sub(r"$\\1$", text)
+    text = LATEX_DISPLAY.sub(r"$$\1$$", text)
+    text = LATEX_INLINE.sub(r"$\1$", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 

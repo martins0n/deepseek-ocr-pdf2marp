@@ -30,8 +30,8 @@ from transformers import AutoModel, AutoTokenizer
 MODEL_NAME = "deepseek-ai/DeepSeek-OCR"
 PROMPT = "<image>\n<|grounding|>Convert the slide to markdown."
 DEFAULT_BASE = 1024
-LATEX_DISPLAY = re.compile(r"\\\\\[(.*?)\\\\\]", re.DOTALL)
-LATEX_INLINE = re.compile(r"\\\\\((.*?)\\\\\)")
+LATEX_DISPLAY = re.compile(r"\\\[(.+?)\\\]", re.DOTALL)
+LATEX_INLINE = re.compile(r"\\\((.+?)\\\)")
 REGION_PATTERN = re.compile(
     r"<\|ref\|>([^<]+)<\|/ref\|><\|det\|>\[\[([^\]]+)\]\]<\|/det\|>(.*?)(?=<\|ref\||$)",
     re.DOTALL,
