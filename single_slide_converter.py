@@ -34,6 +34,13 @@ REGION_PATTERN = re.compile(
     re.DOTALL,
 )
 
+# Bounding box validation thresholds
+BBOX_TRANSFORM_SIZE_THRESHOLD = 0.75  # Filter boxes > 75% of base_size from transform
+BBOX_DRAW_SIZE_THRESHOLD = 0.9  # Don't draw boxes > 90% of base_size
+BBOX_EDGE_MARGIN = 5  # Pixels from edges to consider suspicious
+BBOX_MIN_SIZE = 5  # Minimum refined box size in pixels
+BBOX_MAX_RATIO = 0.95  # Maximum refined box size as ratio of image
+
 
 def load_model(device: str):
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
@@ -155,14 +162,14 @@ def compute_transform(gray, regions, base_size=DEFAULT_BASE, threshold=240):
         box_width = x2 - x1
         box_height = y2 - y1
         
-        # Skip boxes that are too large (> 75% of base_size)
+        # Skip boxes that are too large
         # These are often full-slide images or incorrectly detected regions
-        if box_width > base_size * 0.75 or box_height > base_size * 0.75:
+        if box_width > base_size * BBOX_TRANSFORM_SIZE_THRESHOLD or box_height > base_size * BBOX_TRANSFORM_SIZE_THRESHOLD:
             continue
             
         # Skip boxes with invalid or suspicious coordinates
         # Boxes at (0,0) or spanning nearly the full coordinate space
-        if (x1 <= 5 and y1 <= 5) or (x2 >= base_size - 5 and y2 >= base_size - 5):
+        if (x1 <= BBOX_EDGE_MARGIN and y1 <= BBOX_EDGE_MARGIN) or (x2 >= base_size - BBOX_EDGE_MARGIN and y2 >= base_size - BBOX_EDGE_MARGIN):
             continue
             
         filtered_regions.append(region)
@@ -273,7 +280,7 @@ def draw_debug(image_path: Path, regions, transform, output_path: Path):
         box_height = y2 - y1
         
         # Skip extremely large boxes that likely indicate OCR errors
-        if box_width > DEFAULT_BASE * 0.9 or box_height > DEFAULT_BASE * 0.9:
+        if box_width > DEFAULT_BASE * BBOX_DRAW_SIZE_THRESHOLD or box_height > DEFAULT_BASE * BBOX_DRAW_SIZE_THRESHOLD:
             continue
         
         bbox = apply_transform(region["bbox"], transform, width, height)
@@ -282,9 +289,9 @@ def draw_debug(image_path: Path, regions, transform, output_path: Path):
         # Additional validation: skip if refined box is still too large or invalid
         refined_width = bbox[2] - bbox[0]
         refined_height = bbox[3] - bbox[1]
-        if refined_width < 5 or refined_height < 5:
+        if refined_width < BBOX_MIN_SIZE or refined_height < BBOX_MIN_SIZE:
             continue
-        if refined_width > width * 0.95 or refined_height > height * 0.95:
+        if refined_width > width * BBOX_MAX_RATIO or refined_height > height * BBOX_MAX_RATIO:
             continue
         
         color = COLORS.get(region["type"], (255, 255, 255))
