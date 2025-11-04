@@ -147,7 +147,31 @@ def compute_transform(gray, regions, base_size=DEFAULT_BASE, threshold=240):
     xs_src, xs_dst = [], []
     ys_src, ys_dst = [], []
 
+    # Filter regions for transform computation to avoid outliers
+    # Skip boxes that are too large or at suspicious coordinates
+    filtered_regions = []
     for region in regions:
+        x1, y1, x2, y2 = region["bbox"]
+        box_width = x2 - x1
+        box_height = y2 - y1
+        
+        # Skip boxes that are too large (> 75% of base_size)
+        # These are often full-slide images or incorrectly detected regions
+        if box_width > base_size * 0.75 or box_height > base_size * 0.75:
+            continue
+            
+        # Skip boxes with invalid or suspicious coordinates
+        # Boxes at (0,0) or spanning nearly the full coordinate space
+        if (x1 <= 5 and y1 <= 5) or (x2 >= base_size - 5 and y2 >= base_size - 5):
+            continue
+            
+        filtered_regions.append(region)
+
+    # If we filtered out too many regions, fall back to using all regions
+    if len(filtered_regions) < 2:
+        filtered_regions = regions
+
+    for region in filtered_regions:
         x1, y1, x2, y2 = region["bbox"]
         ax1 = max(0, int(round(x1 * default_scale_x)) - 10)
         ax2 = min(width, int(round(x2 * default_scale_x)) + 10)
