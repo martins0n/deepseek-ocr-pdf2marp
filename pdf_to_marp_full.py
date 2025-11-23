@@ -417,15 +417,14 @@ def create_debug_visualization(slides_dir, debug_dir, slides_data):
             color = COLORS.get(region['type'], (255, 255, 255))
 
             for offset in range(line_width):
-                draw.rectangle(
-                    [
-                        refined[0] + offset,
-                        refined[1] + offset,
-                        refined[2] - offset,
-                        refined[3] - offset
-                    ],
-                    outline=color
-                )
+                x0 = refined[0] + offset
+                y0 = refined[1] + offset
+                x1 = refined[2] - offset
+                y1 = refined[3] - offset
+
+                # Skip if bbox becomes invalid after applying offset
+                if x1 > x0 and y1 > y0:
+                    draw.rectangle([x0, y0, x1, y1], outline=color)
 
             label = region['type']
             label_x = refined[0] + line_width
