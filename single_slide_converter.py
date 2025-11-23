@@ -34,6 +34,13 @@ REGION_PATTERN = re.compile(
     re.DOTALL,
 )
 
+# Bounding box validation thresholds
+BBOX_TRANSFORM_SIZE_THRESHOLD = 0.75  # Filter boxes > 75% of base_size from transform
+BBOX_DRAW_SIZE_THRESHOLD = 0.9  # Don't draw boxes > 90% of base_size
+BBOX_EDGE_MARGIN = 5  # Pixels from edges to consider suspicious
+BBOX_MIN_SIZE = 5  # Minimum refined box size in pixels
+BBOX_MAX_RATIO = 0.95  # Maximum refined box size as ratio of image
+
 
 def load_model(device: str):
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
@@ -147,7 +154,31 @@ def compute_transform(gray, regions, base_size=DEFAULT_BASE, threshold=240):
     xs_src, xs_dst = [], []
     ys_src, ys_dst = [], []
 
+    # Filter regions for transform computation to avoid outliers
+    # Skip boxes that are too large or at suspicious coordinates
+    filtered_regions = []
     for region in regions:
+        x1, y1, x2, y2 = region["bbox"]
+        box_width = x2 - x1
+        box_height = y2 - y1
+        
+        # Skip boxes that are too large
+        # These are often full-slide images or incorrectly detected regions
+        if box_width > base_size * BBOX_TRANSFORM_SIZE_THRESHOLD or box_height > base_size * BBOX_TRANSFORM_SIZE_THRESHOLD:
+            continue
+            
+        # Skip boxes with invalid or suspicious coordinates
+        # Boxes at (0,0) or spanning nearly the full coordinate space
+        if (x1 <= BBOX_EDGE_MARGIN and y1 <= BBOX_EDGE_MARGIN) or (x2 >= base_size - BBOX_EDGE_MARGIN and y2 >= base_size - BBOX_EDGE_MARGIN):
+            continue
+            
+        filtered_regions.append(region)
+
+    # If we filtered out too many regions, fall back to using all regions
+    if len(filtered_regions) < 2:
+        filtered_regions = regions
+
+    for region in filtered_regions:
         x1, y1, x2, y2 = region["bbox"]
         ax1 = max(0, int(round(x1 * default_scale_x)) - 10)
         ax2 = min(width, int(round(x2 * default_scale_x)) + 10)
@@ -243,8 +274,26 @@ def draw_debug(image_path: Path, regions, transform, output_path: Path):
         font = ImageFont.load_default()
 
     for region in regions:
+        # Skip drawing boxes that are clearly problematic
+        x1, y1, x2, y2 = region["bbox"]
+        box_width = x2 - x1
+        box_height = y2 - y1
+        
+        # Skip extremely large boxes that likely indicate OCR errors
+        if box_width > DEFAULT_BASE * BBOX_DRAW_SIZE_THRESHOLD or box_height > DEFAULT_BASE * BBOX_DRAW_SIZE_THRESHOLD:
+            continue
+        
         bbox = apply_transform(region["bbox"], transform, width, height)
         bbox = refine_bbox(gray, bbox)
+        
+        # Additional validation: skip if refined box is still too large or invalid
+        refined_width = bbox[2] - bbox[0]
+        refined_height = bbox[3] - bbox[1]
+        if refined_width < BBOX_MIN_SIZE or refined_height < BBOX_MIN_SIZE:
+            continue
+        if refined_width > width * BBOX_MAX_RATIO or refined_height > height * BBOX_MAX_RATIO:
+            continue
+        
         color = COLORS.get(region["type"], (255, 255, 255))
         line_width = max(1, int(4 * default_scale))
         for offset in range(line_width):
